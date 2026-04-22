@@ -1,0 +1,151 @@
+name: Deploy K3s LXC VM
+
+on:
+  workflow_dispatch:
+    inputs:
+      vm_name:
+        description: 'VM Name'
+        required: true
+        default: 'k3s-dev-cluster-01'
+      action:
+        description: 'Action'
+        required: true
+        default: 'deploy'
+        type: choice
+        options:
+          - deploy
+          - delete
+          - start
+          - stop
+          - status
+
+env:
+  LXC_SERVER: ${{ vars.LXC_SERVER || '192.168.1.206' }}
+  LXC_PORT: ${{ vars.LXC_PORT || '8443' }}
+  LXC_PROJECT: ${{ vars.LXC_PROJECT || 'default' }}
+  LXC_PROFILE: ${{ vars.LXC_PROFILE || 'k3s-dev-cluster-01-profile' }}
+  LXC_IMAGE: ${{ vars.LXC_IMAGE || 'ubuntu/22.04' }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install LXC
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lxc
+
+      - name: Setup LXC Certificates
+        run: |
+          mkdir -p ~/.config/lxc
+          cp lxc/client.crt ~/.config/lxc/
+          cp lxc/client.key ~/.config/lxc/
+          chmod 600 ~/.config/lxc/client.key
+
+      - name: Configure LXC Remote
+        run: |
+          cat > ~/.config/lxc/config.yml << 'EOF'
+          default-remote: runner
+          remotes:
+            runner:
+              addr: https://${{ env.LXC_SERVER }}:${{ env.LXC_PORT }}
+              protocol: lxd
+              auth_type: tls
+              certificate: |
+                -----BEGIN CERTIFICATE-----
+                MIIFCzCCAvOgAwIBAgIUCbFyGjVdR5W3ZmbHIbPdLVUB76YwDQYJKoZIhvcNAQEL
+                BQAwFTETMBEGA1UEAwwKTFhEIGNsaWVudDAeFw0yNjA0MTcyMjQzMjRaFw0zNjA0
+                MTQyMjQzMjRaMBUxEzARBgNVBAMMCkxYRCBjbGllbnQwggIiMA0GCSqGSIb3DQEB
+                AQUAA4ICDwAwggIKAoICAQDG8FclkKYGHhvb64BtcrO2lWj91e8oVeuNd5quq09S
+                0Nvcp1iAgXXnHqFW1jLdK+zQMiWkUyoRUHQ+x4QF3u9jPSR0HtSx5F6ryr/4XCR4
+                WIiKECW59Z5ZTJ9oM1sxIhg3HCfRbHYqKtK2yK+YvhQON/XR+17B0GAqHuadzHGM
+                2iZM2GhjfXWRdu5e/14MUX33E+Xt3cHN0/iz7Tasp9PIn3uPbOIt1XzRJa/eTfba
+                kSjsbbzJ83GD5bKflz/Ecso7UAKOnWhNuhgPNUKauPMTyMMQ6FkPH7ZLkeBfgNJY
+                EkyTV+6pQ2CBC0oNl8A8A4R3nAv0rszaGgvljtoVSn/cvYg8QWTRxduuTwy9NQIH
+                Ps5l+IjGMAIEMMNzWnqmhgjg67e+4rbC+gsN/cOVL6HvA5osh66BHksLZiPLZiB/
+                KqomfkBBC5ElHxiSVcGVp3BVmUof8/CxQheTBq8c3cz/lCvP+4YbhyMcFLN1+D4z
+                1X+DypB7gXjLXsaII7LHn7drQ+n23imrZjD+oR79Nf3Qn9t9QEqBzCWzvYra7G2G
+                Yxssto2pkOlmybrTEfyZpeFCmVhBvpf4Yb5wY/AQ9ncYERbIoRdQ9IPuoAY7EAPH
+                1k+7SVPAwlsvnzgK+Y9NpQOGZAUeW8WSRkmkbsaUVXf7Nnq+xGBRnZO3MmV9Dr0I
+                pwIDAQABo1MwUTAdBgNVHQ4EFgQU/tpzVw4RQVbmJyx0dGWiqXIwMeUwHwYDVR0j
+                BBgwFoAU/tpzVw4RQVbmJyx0dGWiqXIwMeUwDwYDVR0TAQH/BAUwAwEB/zANBgkq
+                hkiG9w0BAQsFAAOCAgEAKOwJUzYCjLxVjCHCw1RHkN73ksRb1CUQ74UiLl+7YrtK
+                sGxSb0j8+m3NmLC9mu/cC1BqGRxwxHTSWienUkZBt4IUQ87K7+XmefzirVQPVAaA
+                yYUF+O3JydUqzuvTyCW8+RZ6kjtPa1Z0d/llyfQK/CcTJ2PKkFd02dKsgobTXz9I
+                zp9zvuod7+dJclJ5GCjtRZF5WzWx5F++9CT8TIpmeVUS3X9XMTY4GgJXwdtII9ap
+                +Dw8pdAqZFCLcvWRBWZoSWY1HuUcf7HnrQKUYvgcuZPz3ZJatmdyXWH5Aw7v3kxT
+                m1e4O7QJTgAtLudJGZQWTBRCU+ggAN2HgOa0G6s8ImqU0rqeky0Lh4aOttLPFwOY
+                l57h9kz+BTPKNRIpWexIlKNfP4KkXievZWWTdqKrVlkwZn1WUxfBOFA7uiZ811mI
+                GPM+03S4JRRJ4oHzEsfpbPfkBojqMvg9SoQcTLbBaCDflKRMvfAcfXubC1vUSIxF
+                63xQsTSz58voFz5qkj0E7g4pBTxBCnis/9avQIPvycMCKOfqo/FK41F1Ay18ea/G
+                Chiy42m9J0zfrtzc5va6G1D/ETmVUG1coD6K3QfvhKlyeLy0OOKUajkDbqdb495D
+                RNc/kxxwbayFm+A91jwVoZKhfzvswx+5ie6UO63mn/3mR3BrPJnHeRaZhWQskjk=
+                -----END CERTIFICATE-----
+                EOF
+
+      - name: Test LXC Connection
+        run: |
+          lxc list
+          lxc remote list
+
+      - name: Deploy VM
+        if: github.event.inputs.action == 'deploy'
+        run: |
+          lxc profile show ${{ env.LXC_PROFILE }} || lxc profile create ${{ env.LXC_PROFILE }}
+          lxc profile edit ${{ env.LXC_PROFILE }} < lxc/k3s-dev-cluster-01-profile.yaml
+          lxc launch ${{ env.LXC_IMAGE }} ${{ github.event.inputs.vm_name }} \
+            --profile ${{ env.LXC_PROFILE }} \
+            --project ${{ env.LXC_PROJECT }}
+
+      - name: Start VM
+        if: github.event.inputs.action == 'start'
+        run: |
+          lxc start ${{ github.event.inputs.vm_name }}
+
+      - name: Stop VM
+        if: github.event.inputs.action == 'stop'
+        run: |
+          lxc stop ${{ github.event.inputs.vm_name }}
+
+      - name: Delete VM
+        if: github.event.inputs.action == 'delete'
+        run: |
+          lxc delete ${{ github.event.inputs.vm_name }} --force
+
+      - name: Get VM Status
+        if: github.event.inputs.action == 'status'
+        run: |
+          lxc list ${{ github.event.inputs.vm_name }} --project ${{ env.LXC_PROJECT }}
+
+      - name: Wait for VM
+        if: github.event.inputs.action == 'deploy'
+        run: sleep 30
+
+      - name: Install K3s
+        if: github.event.inputs.action == 'deploy'
+        run: |
+          lxc exec ${{ github.event.inputs.vm_name }} -- bash -c '
+            curl -sfL https://get.k3s.io | sh -
+          '
+
+      - name: Install Tailscale
+        if: github.event.inputs.action == 'deploy'
+        env:
+          TS_AUTHKEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+        run: |
+          lxc exec ${{ github.event.inputs.vm_name }} -- bash -c '
+            curl -fsSL https://tailscale.com/install.sh | sh
+            tailscale up --authkey=$TS_AUTHKEY --accept-routes
+          '
+
+      - name: Get VM Info
+        if: github.event.inputs.action == 'status' || github.event.inputs.action == 'deploy'
+        run: |
+          echo "=== VM Info ==="
+          lxc list ${{ github.event.inputs.vm_name }} --project ${{ env.LXC_PROJECT }}
+          echo ""
+          echo "=== Network Info ==="
+          lxc exec ${{ github.event.inputs.vm_name }} -- ip addr show
