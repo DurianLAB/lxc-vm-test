@@ -14,6 +14,7 @@ on:
         type: choice
         options:
           - deploy
+          - test-macvlan
           - delete
           - start
           - stop
@@ -99,6 +100,26 @@ jobs:
           lxc launch ${{ env.LXC_IMAGE }} ${{ github.event.inputs.vm_name }} \
             --profile ${{ env.LXC_PROFILE }} \
             --project ${{ env.LXC_PROJECT }}
+
+      - name: Test MACVLAN
+        if: github.event.inputs.action == 'test-macvlan'
+        run: |
+          VM_NAME="test-macvlan-${{ github.run_id }}"
+          echo "Testing macvlan with VM: $VM_NAME"
+          lxc launch ${{ env.LXC_IMAGE }} $VM_NAME \
+            --profile default \
+            --profile runner-macvlan \
+            --project ${{ env.LXC_PROJECT }}
+          echo "Waiting for VM to provision..."
+          sleep 30
+          echo "=== VM Info ==="
+          lxc list $VM_NAME --project ${{ env.LXC_PROJECT }}
+          echo ""
+          echo "=== Network Info ==="
+          lxc exec $VM_NAME -- ip addr show
+          echo ""
+          echo "=== Cleanup ==="
+          lxc delete $VM_NAME --force || true
 
       - name: Start VM
         if: github.event.inputs.action == 'start'
