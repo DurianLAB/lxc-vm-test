@@ -42,8 +42,8 @@ jobs:
       - name: Setup LXC Certificates
         run: |
           mkdir -p ~/.config/lxc
-          cp lxc/client.crt ~/.config/lxc/
-          cp lxc/client.key ~/.config/lxc/
+          echo "${{ secrets.LXC_CLIENT_CRT }}" > ~/.config/lxc/client.crt
+          echo "${{ secrets.LXC_CLIENT_KEY }}" > ~/.config/lxc/client.key
           chmod 600 ~/.config/lxc/client.key
 
       - name: Configure LXC Remote
