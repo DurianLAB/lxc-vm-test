@@ -36,8 +36,9 @@ jobs:
 
       - name: Install LXC
         run: |
-          sudo apt-get update
-          sudo apt-get install -y lxc
+          sudo snap install lxd --channel latest/stable
+          sudo ln -s /snap/lxd/current/bin/lxc /usr/local/bin/lxc || true
+          sudo ln -s /snap/lxd/current/bin/lxd /usr/local/bin/lxd || true
 
       - name: Setup LXC Certificates
         run: |
